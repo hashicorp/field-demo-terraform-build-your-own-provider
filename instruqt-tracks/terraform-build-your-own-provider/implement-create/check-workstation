@@ -1,0 +1,92 @@
+#!/bin/bash -l
+
+# Check `hashicups/resource_order.go` exists
+if ! test -f "$RESOURCE_ORDER_FILE"; then
+    fail-message "You haven't created '$RESOURCE_ORDER_FILE' yet."
+    exit 1
+fi
+
+# Check all the expected updates have been mamde to `hashicups/resource_order.go`
+if ! grep -q 'resourceOrder' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'resourceOrder' function to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+if ! grep -q 'resourceOrderCreate' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'resourceOrderCreate' function to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+if ! grep -q 'resourceOrderRead' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'resourceOrderRead' function to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+if ! grep -q 'resourceOrderUpdate' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'resourceOrderUpdate' function to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+if ! grep -q 'resourceOrderDelete' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'resourceOrderDelete' function to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+# Check that the schema was updated properly
+if ! grep -q '"items": &schema.Schema{' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to update the schema in '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+# Check that the resourceOrderCreate function was implemented (not just present)
+if ! grep -q 'o, err := c.CreateOrder(ois)' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to implement the resourceOrderCreate function in '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+# Check `hashicups/resource_order.go` has the new imports
+if ! grep -q 'github.com/hashicorp-demoapp/hashicups-client-go' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'github.com/hashicorp-demoapp/hashicups-client-go' import to 'hashicups/resource_order.go'."
+    exit 1
+fi
+
+if ! grep -q 'strconv' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'strconv' import to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+if ! grep -q 'items' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to add the 'items' schema to '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+# Check that the resourceOrderRead function was implemented (not just present)
+if ! grep -q 'orderItems := flattenOrderItems(&order.Items)' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to implement the resourceOrderRead function in '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+# Check that the flattenOrderItems function was implemented (not just present)
+if ! grep -q 'func flattenOrderItems' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to implement the flattenOrderItems function in '$RESOURCE_ORDER_FILE'."
+fi
+
+# Check that the flattenCoffee function was implemented (not just present)
+if ! grep -q 'func flattenCoffee(coffee hc.Coffee)' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to implement the flattenCoffee function in '$RESOURCE_ORDER_FILE'."
+    exit 1
+fi
+
+# Check that the order resource has been added to the provider
+if ! grep -q '"hashicups_order": resourceOrder()' "$PROVIDER_FILE"; then
+    fail-message "You need to implement the resourceOrderRead function in '$PROVIDER_FILE'."
+    exit 1
+fi
+
+# Check the outputs are as expected
+cd $PROJECT_HOME_DIR/examples
+COFFEE_QUANTITY=$(terraform output -json | jq -r .edu_order.value.items[0].quantity)
+if ! [ "$COFFEE_QUANTITY" = "2" ]; then
+    fail-message "You did not successfully add the new outputs to your Terraform configuration."
+    exit 1
+fi

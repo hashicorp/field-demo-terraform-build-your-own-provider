@@ -1,0 +1,19 @@
+#!/bin/bash -l
+
+# Check out the branch with all the correct files
+cd $PROJECT_HOME_DIR
+git checkout implement-import
+
+# Install the provider
+make instruqt_install
+
+# Initialize the terraform config
+cd $PROJECT_HOME_DIR/examples/import
+terraform init
+
+# Create an order and grab the ID of it so we can import it
+NEW_ORDER_ID=$(curl -X POST -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders -d '[{"coffee": { "id":1 }, "quantity":4}, {"coffee": { "id":3 }, "quantity":3}]' | jq -r .id)
+
+terraform import hashicups_order.sample $NEW_ORDER_ID
+
+exit 0

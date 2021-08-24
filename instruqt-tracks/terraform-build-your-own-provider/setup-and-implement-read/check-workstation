@@ -1,0 +1,66 @@
+#!/bin/bash -l
+
+# Check the user looked up the health of the app
+if ! grep -q 'curl localhost:19090/health' "$BASH_HISTORY_FILE"; then
+    fail-message "You haven't run 'curl localhost:19090/health' yet."
+    exit 1
+fi
+
+# Check `go.mod` exists
+if ! test -f "$MOD_FILE"; then
+    fail-message "You haven't run 'go mod init terraform-provider-hashicups' yet."
+    exit 1
+fi
+
+# Check the `vendor/modules.txt` file exists
+if ! test -f "$MODTEXT_FILE"; then
+    fail-message "You haven't run 'go mod vendor' yet."
+    exit 1
+fi
+
+# Check `hashicups/provider.go` has `hashicup_coffees` as a data source
+if ! grep -q 'hashicups_coffees' "$PROVIDER_FILE"; then
+    fail-message "You need to add 'hashicup_coffees' data source in '$PROVIDER_FILE'."
+    exit 1
+fi
+
+# Check `hashicups/data_source_coffee.go` file exists
+if ! test -f "$DATA_SOURCE_COFFEE_FILE"; then
+    fail-message "You haven't created the '$DATA_SOURCE_COFFEE_FILE' file yet."
+    exit 1
+fi
+
+# Check `hashicups/data_source_coffee.go` for `func dataSourceCoffees()`
+if ! grep -q 'func dataSourceCoffees' "$DATA_SOURCE_COFFEE_FILE"; then
+    fail-message "You need to define the 'dataSourceCoffees' function in '$DATA_SOURCE_COFFEE_FILE'."
+    exit 1
+fi
+
+# Check `hashicups/data_source_coffee.go` for `func dataSourceCoffeesRead()`
+if ! grep -q 'func dataSourceCoffeesRead' "$DATA_SOURCE_COFFEE_FILE"; then
+    fail-message "You need to define the 'dataSourceCoffeesRead' function in '$DATA_SOURCE_COFFEE_FILE'."
+    exit 1
+fi
+
+# Check `hashicups/data_source_coffee.go` for `ingredients` schema
+if ! grep -q '"ingredients": &schema.Schema{' "$DATA_SOURCE_COFFEE_FILE"; then
+    fail-message "You need to define the correct schema for the 'dataSourceCoffees' function in '$DATA_SOURCE_COFFEE_FILE'."
+    exit 1
+fi
+
+# Check that the user read from the `/coffees` endpoint
+grep -q "curl localhost:19090/coffees" /root/.bash_history || fail-message "You haven't run 'curl localhost:19090/coffees' yet."
+
+# Check the provider has been built and installed
+if ! test -f "$PROVIDER_BINARY_FILE"; then
+    fail-message "You haven't built and installed the provider binary."
+    exit 1
+fi
+
+# Check the terraform output looking for a "Packer Spiced Latte"
+cd $PROJECT_HOME_DIR/examples
+TF_OUTPUT=$(terraform output -json | jq -r .psl.value[].name)
+if [ "$TF_OUTPUT" != "Packer Spiced Latte" ]; then
+    fail-message "You need to run 'terraform init && terraform apply --auto-approve' to return the Packer Spice Latte's properties."
+    exit 1
+fi

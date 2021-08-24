@@ -1,0 +1,21 @@
+#!/bin/bash -l
+
+# NOTE: There isn't a great way to check a bad sign-in with this architecture, so just check
+# that the right stuff is in place, and that the credentials have been set back to the good ones.
+
+# Check for the `diags` in `providerConfigure` (`hashicups/provider.go`)
+if ! grep -q 'diags = append' "$PROVIDER_FILE"; then
+    fail-message "You need to add the 'diags' variable to your `providerConfigure` function in '$PROVIDER_FILE'."
+    exit 1
+fi
+
+# Confirm the environment variables were reset to valid credentials
+if ! [ "$HASHICUPS_USERNAME" = "education" ]; then
+    fail-message "You did not reset the 'HASHICUPS_USERNAME' to the correct value 'education'."
+    exit 1
+fi
+
+if ! [ "$HASHICUPS_PASSWORD" = "test123" ]; then
+    fail-message "You did not reset the 'HASHICUPS_PASSWORD' to the correct value 'test123'."
+    exit 1
+fi

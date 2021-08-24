@@ -1,0 +1,38 @@
+#!/bin/bash -l
+
+# Enable bash history
+HISTFILE=/root/.bash_history
+set -o history
+
+# Check out the branch with all the correct files
+cd $PROJECT_HOME_DIR
+git checkout auth-configuration
+
+# Install the new dependencies
+go mod vendor
+
+# Create the user we need
+curl -X POST localhost:19090/signup -d '{"username":"education", "password":"test123"}'
+
+# Sign in as that user and set the HASHICUPS_TOKEN
+export HASHICUPS_TOKEN=$(curl -X POST localhost:19090/signin -d '{"username":"education", "password":"test123"}' | jq -r .token)
+
+# Put the HASHICUPS_TOKEN in our .bashrc file
+echo "export HASHICUPS_TOKEN=${HASHICUPS_TOKEN}" >> ~/.bashrc
+
+# Install the provider
+make instruqt_install
+
+# Set our username and password as env vars
+export HASHICUPS_USERNAME="education"
+export HASHICUPS_PASSWORD="test123"
+
+# Put the two env vars in our .bashrc file
+echo "export HASHICUPS_USERNAME=${HASHICUPS_USERNAME}" >> ~/.bashrc
+echo "export HASHICUPS_PASSWORD=${HASHICUPS_PASSWORD}" >> ~/.bashrc
+
+# Initialize and apply
+cd $PROJECT_HOME_DIR/examples
+terraform init && terraform apply -auto-approve
+
+exit 0

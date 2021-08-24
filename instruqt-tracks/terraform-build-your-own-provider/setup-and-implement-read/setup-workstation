@@ -1,0 +1,104 @@
+#!/bin/sh
+
+###########
+# Requires Golang version 1.16.3
+# Requires Docker Compose version 1.29.1
+###########
+PROJECT_HOME_DIR="/root/github.com/hashicorp/terraform-provider-hashicups/"
+
+
+###########
+# Install Docker Compose and Docker
+###########
+apt-get update
+apt install -y docker-compose docker.io
+
+sudo systemctl unmask docker
+sudo systemctl start docker
+
+
+###########
+# Add all our relevant env vars to the bashrc
+###########
+PATH=$PATH:/usr/bin/go/bin
+GOPATH=/root
+echo "export PATH=$PATH:/usr/bin/go/bin" >> /root/.bashrc
+echo "export GOPATH=$GOPATH" >> /root/.bashrc
+
+echo "export PROJECT_HOME_DIR=$PROJECT_HOME_DIR" >> /root/.bashrc
+
+MOD_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/go.mod
+MODTEXT_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/vendor/modules.txt
+echo "export MOD_FILE=$MOD_FILE" >> /root/.bashrc
+echo "export MODTEXT_FILE=$MODTEXT_FILE" >> /root/.bashrc
+
+BASH_HISTORY_FILE=/root/.bash_history
+BASHRC_FILE=/root/.bashrc
+echo "export BASH_HISTORY_FILE=$BASH_HISTORY_FILE" >> /root/.bashrc
+echo "export BASHRC_FILE=$BASHRC_FILE" >> /root/.bashrc
+
+PROVIDER_VERSION=0.3
+PROVIDER_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/hashicups/provider.go
+PROVIDER_BINARY_FILE=/root/.terraform.d/plugins/hashicorp.com/edu/hashicups/$PROVIDER_VERSION/linux_amd64/terraform-provider-hashicups
+echo "export PROVIDER_FILE=$PROVIDER_FILE" >> /root/.bashrc
+echo "export PROVIDER_BINARY_FILE=$PROVIDER_BINARY_FILE" >> /root/.bashrc
+
+DATA_SOURCE_COFFEE_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/hashicups/data_source_coffee.go
+DATA_SOURCE_ORDERS_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/hashicups/data_source_order.go
+echo "export DATA_SOURCE_COFFEE_FILE=$DATA_SOURCE_COFFEE_FILE" >> /root/.bashrc
+echo "export DATA_SOURCE_ORDERS_FILE=$DATA_SOURCE_ORDERS_FILE" >> /root/.bashrc
+
+RESOURCE_ORDER_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/hashicups/resource_order.go
+echo "export RESOURCE_ORDER_FILE=$RESOURCE_ORDER_FILE" >> /root/.bashrc
+
+TF_DIR=/root/github.com/hashicorp/terraform-provider-hashicups/examples
+TF_MAIN_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/examples/main.tf
+TF_IMPORT_MAIN_FILE=/root/github.com/hashicorp/terraform-provider-hashicups/examples/import/main.tf
+echo "export TF_DIR=$TF_DIR" >> /root/.bashrc
+echo "export TF_MAIN_FILE=$TF_MAIN_FILE" >> /root/.bashrc
+echo "export TF_IMPORT_MAIN_FILE=$TF_IMPORT_MAIN_FILE" >> /root/.bashrc
+
+
+###########
+# Set up the development environment
+###########
+mkdir -p /root/github.com/hashicorp/
+cd /root/github.com/hashicorp/
+# git clone --branch boilerplate https://github.com/hashicorp/terraform-provider-hashicups
+git clone --branch boilerplate https://github.com/dahlke/terraform-provider-hashicups
+
+# Create a unit file for VS Code server
+cat <<-EOF > /etc/systemd/system/code-server.service
+[Unit]
+Description=Code Server
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/usr/bin/code-server --host 0.0.0.0 --port 8443 --cert --auth none /root/github.com/hashicorp/terraform-provider-hashicups/
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start VS Code server
+systemctl enable code-server
+systemctl start code-server
+
+
+###########
+# Start the HashiCups Application
+###########
+cd $PROJECT_HOME_DIR/docker_compose
+docker-compose up -d
+
+
+###########
+# Set the working directory to the project home
+###########
+set-workdir $PROJECT_HOME_DIR
+
+
+exit 0

@@ -1,0 +1,14 @@
+#!/bin/bash -l
+
+# Check out the previous branch to make sure everything is as we expect
+cd $PROJECT_HOME_DIR
+git checkout implement-delete
+
+# Install the provider
+cd $PROJECT_HOME_DIR
+make instruqt_install
+
+# Set the working directory to the project home
+set-workdir $PROJECT_HOME_DIR
+
+exit 0

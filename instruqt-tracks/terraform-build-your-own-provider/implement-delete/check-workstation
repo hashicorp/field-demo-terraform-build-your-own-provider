@@ -1,0 +1,15 @@
+#!/bin/bash -l
+
+# Check that updates have been made to `hashicups/resource_order.go`
+if ! grep -q 'c.DeleteOrder(orderID)' "$RESOURCE_ORDER_FILE"; then
+    fail-message "You need to update 'resourceOrderDelete' function in '$RESOURCE_ORDER_FILE' using the code example."
+    exit 1
+fi
+
+# Confirm the order has been destroyed
+cd $PROJECT_HOME_DIR/examples
+TF_OUT_JSON=$(terraform output -json)
+if ! [ "$TF_OUT_JSON" = "{}" ]; then
+    fail-message "You did not successfully run terraform destroy."
+    exit 1
+fi

@@ -1,0 +1,14 @@
+#!/bin/bash -l
+
+# Check out the branch with all the correct files
+cd $PROJECT_HOME_DIR
+git checkout implement-update
+
+# Install the provider
+make instruqt_install
+
+# Initialize and apply
+cd $PROJECT_HOME_DIR/examples
+terraform init && terraform apply -auto-approve
+
+exit 0

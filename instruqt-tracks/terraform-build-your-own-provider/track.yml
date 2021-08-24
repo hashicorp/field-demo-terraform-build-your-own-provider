@@ -1,0 +1,2226 @@
+slug: terraform-build-your-own-provider
+id: h1tpybfmtmve
+type: track
+title: Build Your Own Terraform Provider
+teaser: Learn how to create your own Terraform Provider to perform CRUD operations.
+description: |-
+  In this track, you will create a Terraform provider to interact with a coffee shop application, used by HashiCups,
+  a fictional coffee shop.  In the process, you will learn how providers map target APIs to Terraform in order to
+  create, read, update, and delete resources. It is recommended that you have some familiarity with the Go language, as
+  well as some general software development background. This track is designed for advanced Terraform users.
+icon: https://storage.googleapis.com/instruqt-frontend/assets/hashicorp/tracks/terraform.png
+tags:
+- terraform
+owner: hashicorp
+developers:
+- neil@hashicorp.com
+- nyoung@hashicorp.com
+private: true
+published: true
+show_timer: true
+skipping_enabled: true
+challenges:
+- slug: setup-and-implement-read
+  id: urdnvy0p0y1w
+  type: challenge
+  title: Setup and Implement Read
+  teaser: Learn to implement a read on a public endpoint with a Terraform Provider.
+  notes:
+  - type: text
+    contents: |-
+      In these challenges, you will write a custom provider against the API of a coffee shop application, used by
+      fictional coffee shop HashiCups, using the Terraform Plugin SDKv2. Through the process, you will learn how to create data
+      sources, authenticate the provider to the HashiCups client, and create resources with CRUD functionality.
+  - type: text
+    contents: |-
+      There are a few possible reasons for authoring a custom Terraform provider, including:
+
+      - An internal private cloud whose functionality is either proprietary or would not benefit the open source community.
+      - Extending the capabilities of an existing provider (bug fixes, new features, or customizations)
+
+      Terraform Core is a statically-compiled binary written in the Go programming language and plugins are also written
+      in Go and are executable binaries invoked by Terraform Core over RPC.
+  - type: text
+    contents: |-
+      In this challenge, you will set up your Terraform provider development environment and create a coffees data
+      source that will return all coffees HashiCups serves. To do this, you will:
+
+      - *Explore your development environment.*
+      - *Define the _coffees_ data source.* You will add a scaffold that defines an empty schema and functions to retrieve a list of coffees.
+      - *Define the _coffees_ schema.* The schema defines properties that allow Terraform to recognize, reference and store the coffees data resource.
+      - *Implement read.* This read function invokes a `GET` request to the `/coffees` endpoint, then maps its value to the schema defined above.
+      - *Add coffees data source to the provider schema.* This allows you to use the data source in your configuration.
+  assignment: |-
+    *Set up your development environment*
+
+    The Terraform HashiCups Provider repository has been cloned for you. It will serve as the boilerplate for your
+    provider workspace. Change into the cloned repository.
+
+    Notice there are two tabs in the top left corner. You can use VS Code to make any edits in this track, or, if you
+    prefer you can use an editor in the terminal tab.
+
+    The HashiCups provider requires an instance of HashiCups, a server application with a simple REST API. This has been started for you using `docker-compose` and
+    the service is run on port `:19090`. Confirm the service is running.
+
+    ```
+    curl localhost:19090/health
+    ```
+
+    You should see an `ok` returned.
+
+    *Explore your development environment*
+
+    Define the "terraform-provider-hashicups" directory as the root of a Go module and create your module's vendor
+    directory that contains all of the provider's dependencies with the following commands:
+
+    ```
+    go mod init terraform-provider-hashicups
+    go mod vendor
+    ```
+
+    You should see `go` downloading the provider's dependencies.
+
+    *Explore `main.go` file*
+
+    Open `main.go` in the root of the repository. The contents of the main function consume the Plugin SDK's `plugin`
+    library which facilitates the RPC communication between Terraform Core and the plugin.
+
+    Notice the `ProviderFunc` returns a `*schema.Provider` from the `hashicups` package.
+
+    *Explore provider schema*
+
+    Open `hashicups/provider.go`, and see that the file currently defines an empty provider.
+
+    The [`helper/schema` library](https://www.terraform.io/docs/extend/schemas/index.html) is part of Terraform Core.
+    It abstracts many of the complexities and ensures consistency between providers. The `*schema.Provider` type can
+    accept:
+
+    - the resources it supports (`ResourcesMap` and `DataSourcesMap`)
+    - configuration keys (properties in `*schema.Schema{}`)
+    - any callbacks to configure (`ConfigureContextFunc`)
+
+    You can use configuration keys and callbacks to authenticate and configure the provider. You will add them in the
+    Add Authentication to a Provider challenge.
+
+    Next, build the provider using the `Makefile`.
+
+    ```
+    make build
+    ```
+
+    This runs the `go build -o terraform-provider-hashicups` command. Terraform searches for plugins in the format of
+    `terraform-<TYPE>-<NAME>`. In the case above, the plugin is of type "provider" and of name "hashicups".
+
+    To verify things are working correctly, execute the recently created binary.
+
+    ```
+    ./terraform-provider-hashicups
+    ```
+
+    You should see output like the below.
+
+    ```
+    This binary is a plugin. These are not meant to be executed directly.
+    Please execute the program that consumes these plugins, which will
+    load any plugins automatically
+    ```
+
+    *Define `coffees` data source*
+
+    Now that you have created the provider, add the coffees data resource. The coffees data source will pull information
+    on all coffees served by HashiCups.
+
+    Create a new file named `data_source_coffee.go` in the `hashicups` directory and add the following code snippet.
+    As a general convention, Terraform providers put each data source in their own file, named after the resource,
+    prefixed with data_source_.
+
+    The libraries imported here will be used in `dataSourceCoffeesRead`.
+
+    ```
+    package hashicups
+
+    import (
+      "context"
+      "encoding/json"
+      "fmt"
+      "net/http"
+      "strconv"
+      "time"
+
+      "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    )
+
+    func dataSourceCoffees() *schema.Resource {
+      return &schema.Resource{
+        ReadContext: dataSourceCoffeesRead,
+        Schema: map[string]*schema.Schema{},
+      }
+    }
+    ```
+
+    *Define `coffees` schema*
+
+    ```
+    curl localhost:19090/coffees | jq  .
+    ```
+
+    Since the response returns a list of coffees, the coffees schema should reflect that. Update your coffees data
+    source's schema with the following code snippet, by placing it inside the `dataSourceCoffees()` function.
+
+    ```
+    Schema: map[string]*schema.Schema{
+      "coffees": &schema.Schema{
+        Type:     schema.TypeList,
+        Computed: true,
+        Elem: &schema.Resource{
+          Schema: map[string]*schema.Schema{
+            "id": &schema.Schema{
+              Type:     schema.TypeInt,
+              Computed: true,
+            },
+            "name": &schema.Schema{
+              Type:     schema.TypeString,
+              Computed: true,
+            },
+            "teaser": &schema.Schema{
+              Type:     schema.TypeString,
+              Computed: true,
+            },
+            "description": &schema.Schema{
+              Type:     schema.TypeString,
+              Computed: true,
+            },
+            "price": &schema.Schema{
+              Type:     schema.TypeInt,
+              Computed: true,
+            },
+            "image": &schema.Schema{
+              Type:     schema.TypeString,
+              Computed: true,
+            },
+            "ingredients": &schema.Schema{
+              Type:     schema.TypeList,
+              Computed: true,
+              Elem: &schema.Resource{
+                Schema: map[string]*schema.Schema{
+                  "ingredient_id": &schema.Schema{
+                    Type:     schema.TypeInt,
+                    Computed: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice that the coffees schema is a `schema.TypeList` of coffee (`schema.Resource`).
+
+    The coffee resource's properties should map to their respective values in the JSON response. In the above example
+    response:
+
+    - The coffee's `id` is `1`, a `schema.TypeInt`.
+    - The coffee's `name` is `"Packer Spiced Latte"`, a `schema.TypeString`.
+    - The coffee ingredients is an slice of ingredient objects, a `schema.TypeList` with elements `map[string]*schema.Schema{}`.
+
+    You can use various [schema types](https://www.terraform.io/docs/extend/schemas/schema-types.html) to define complex
+    data models. You will implement a complex read in the later challenges.
+
+    *Implement read*
+
+    Now that you defined the coffees schema, you can implement the `dataSourceCoffeesRead` function.
+
+    Add the following read function to your `hashicups/data_source_coffee.go` file.
+
+    ```
+    func dataSourceCoffeesRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      client := &http.Client{Timeout: 10 * time.Second}
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      req, err := http.NewRequest("GET", fmt.Sprintf("%s/coffees", "http://localhost:19090"), nil)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+
+      r, err := client.Do(req)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+      defer r.Body.Close()
+
+      coffees := make([]map[string]interface{}, 0)
+      err = json.NewDecoder(r.Body).Decode(&coffees)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+
+      if err := d.Set("coffees", coffees); err != nil {
+        return diag.FromErr(err)
+      }
+
+      // always run
+      d.SetId(strconv.FormatInt(time.Now().Unix(), 10))
+
+      return diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    This function creates a new GET request to `localhost:19090/coffees`. Then, it decodes the response into a
+    `[]map[string]interface{}`. The `d.Set("coffees", coffees)` function sets the response body (list of coffees
+    object) to Terraform coffees data source, assigning each value to its respective schema position. Finally, it uses
+    `SetID` to set the resource ID.
+
+    Notice that this function returns a `diag.Diagnostics` type, which can return multiple errors and warnings to
+    Terraform, giving users more robust error and warning messages. You can use the `diag.FromErr()` helper function to
+    convert a Go error to a `diag.Diagnostics` type. You will implement this in a later challenge.
+
+    _Tip: This function doesn't use an API client library to explicitly show the steps involved. The HashiCups client
+    library is used to abstract CRUD functionality in other challenges._
+
+    The existence of a non-blank ID tells Terraform that a resource was created. This ID can be any string value, but
+    should be a value that Terraform can use to read the resource again. Since this data resource doesn't have a unique
+    ID, you set the ID to the current UNIX time, which will force this resource to refresh during every Terraform apply.
+
+    When you create something in Terraform but delete it manually, Terraform should gracefully handle it. If the API
+    returns an error when the resource doesn't exist, the read function should check to see if the resource is
+    available first. If the resource isn't available, the function should set the ID to an empty string so Terraform
+    "destroys" the resource in state. The following code snippet is an example of how this can be implemented; you do
+    not need to add this to your configuration for this challenge.
+
+    ```
+    if resourceDoesntExist {
+      d.SetID("")
+      return
+    }
+    ```
+
+    *Add a coffees data source to provider*
+
+    Now that you've defined your data source, you can add it to your provider.
+
+    In your `hashicups/provider.go` file, add the `coffees` data source to the `DataSourcesMap`. The `DataSourcesMap`
+    attribute takes a map of the data source name, `hashicups_coffees`, and the `*schema.Resource` defined in
+    `hashicups/data_source_coffee.go`. Resources and data sources names must follow the `<provider>_<resource_name>`
+    convention.
+
+    Update your `Provider()` to contain the new data source in your `DataSourcesMap`.
+
+    ```
+    // Provider -
+    func Provider() *schema.Provider {
+      return &schema.Provider{
+        ResourcesMap: map[string]*schema.Resource{},
+        DataSourcesMap: map[string]*schema.Resource{
+            "hashicups_coffees":     dataSourceCoffees(),
+        },
+      }
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    *Test the provider*
+
+    Build the provider binary.
+
+    ```
+    make build
+    ```
+
+    Create the appropriate subdirectory within the user plugins directory for the HashiCups provider if it doesn't
+    exist already.
+
+    ```
+    export OS_ARCH="$(go env GOHOSTOS)_$(go env GOHOSTARCH)"
+    mkdir -p ~/.terraform.d/plugins/hashicorp.com/edu/hashicups/0.3/$OS_ARCH
+    ```
+
+    Next, move the binary to the appropriate subdirectory within your user plugins directory.
+
+    ```
+    mv terraform-provider-hashicups ~/.terraform.d/plugins/hashicorp.com/edu/hashicups/0.3/$OS_ARCH
+    ```
+
+    There is a shortcut to do all the above steps, it looks like the below. You will use this going forward.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Finally, initialize your workspace to refresh your HashiCups provider, then apply. This should return the
+    properties of "Packer Spice Latte" in your output.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    You should see output like the below.
+
+    ```
+    Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+
+    Outputs:
+
+    psl = {
+      "1" = {
+        "description" = ""
+        "id" = 1
+        "image" = "/packer.png"
+        "ingredients" = tolist([
+          {
+            "ingredient_id" = 1
+          },
+          {
+            "ingredient_id" = 2
+          },
+          {
+            "ingredient_id" = 4
+          },
+        ])
+        "name" = "Packer Spiced Latte"
+        "price" = 350
+        "teaser" = "Packed with goodness to spice up your images"
+      }
+    }
+    ```
+
+    Congratulations! You created your first Terraform provider and data resource to reference information from an API
+    in your Terraform configuration.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: add-authentication-to-a-provider
+  id: 1bxvxvprv1gx
+  type: challenge
+  title: Add Authentication to a Provider
+  teaser: Learn to implement authentication in a Terraform Provider.
+  notes:
+  - type: text
+    contents: |-
+      In this challenge, you will add authentication to a Terraform provider that interacts with the API of a
+      coffee shop application used by HashiCups, and access protected API endpoints.
+  - type: text
+    contents: |-
+      To do this, you will:
+
+      - *Update provider schema.* You will add `username` and `password` parameters to your provider schema. In addition, you will set the `ConfigureContextFunc` property to the name of the function that will configure your provider, `providerConfigure`.
+      - *Define `providerConfigure`* This function actually configures your provider. If both the username and password are not empty, the function returns an authenticated API client; else, the function returns an unauthenticated API client. The authenticated API client is able to access protected endpoints, the unauthenticated one is not.
+  assignment: |-
+    *Update provider schema*
+
+    HashiCups requires a username and password to generate an JSON web token (JWT) which is used to authenticate
+    against protected endpoints. You will use this user to authenticate to the HashiCups provider to manage your
+    orders.
+
+    Create a user on HashiCups named `education` with the password `test123`.
+
+    ```
+    curl -X POST localhost:19090/signup -d '{"username":"education", "password":"test123"}' | jq
+    ```
+
+    You can then sign in again in the future using the below.
+
+    ```
+    curl -X POST localhost:19090/signin -d '{"username":"education", "password":"test123"}'
+    ```
+
+    Set a `HASHICUPS_TOKEN` environment variable to the token generated in the previous step. You will use this later
+    challenges to verify your HashiCups order has been created, updated and deleted.
+
+    ```
+    export HASHICUPS_TOKEN=<YOUR_TOKEN_HERE>
+    ```
+
+    Or to make setting this a little simpler, use this one-liner.
+
+    ```
+    export HASHICUPS_TOKEN=$(curl -X POST localhost:19090/signin -d '{"username":"education", "password":"test123"}' | jq -r .token)
+    ```
+
+    Add this to your `.bashrc` for later usage.
+
+    ```
+    echo "export HASHICUPS_TOKEN=${HASHICUPS_TOKEN}" >> ~/.bashrc
+    ```
+
+    In your `hashicups/provider.go` file, replace the `Provider()` function with the code snippet below. This defines
+    the provider schema (`username`, `password`) and the `ConfigureContextFunc`.
+
+    ```
+    // Provider -
+    func Provider() *schema.Provider {
+      return &schema.Provider{
+        Schema: map[string]*schema.Schema{
+          "username": &schema.Schema{
+            Type:        schema.TypeString,
+            Optional:    true,
+            DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_USERNAME", nil),
+          },
+          "password": &schema.Schema{
+            Type:        schema.TypeString,
+            Optional:    true,
+            Sensitive:   true,
+            DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_PASSWORD", nil),
+          },
+        },
+        ResourcesMap: map[string]*schema.Resource{},
+        DataSourcesMap: map[string]*schema.Resource{
+          "hashicups_coffees":     dataSourceCoffees(),
+        },
+        ConfigureContextFunc: providerConfigure,
+      }
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice the `DefaultFunc` for both the `username` and `password` parameters attempts to use the respective
+    environment variables as the default values. This is useful for automated provider testing.
+
+    *Define `preconfigure`*
+
+    Import the `context`, API client and `diag` libraries into the `hashicups/provider.go` file. The `providerConfigure` function
+    will use these libraries. Replace the `import` block with the one below.
+
+    ```
+    import (
+      "context"
+
+      "github.com/hashicorp-demoapp/hashicups-client-go"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    )
+    ```
+
+    Once you have added the new imports, be sure to install the dependencies. The below command will create a `vendor`
+    directory, and install all dependencies inside it.
+
+    ```
+    go mod vendor
+    ```
+
+    Then, add the `providerConfigure` function below your `Provider()` function. This function retrieves the `username`
+    and `password` from the provider schema to authenticate and configure your provider.
+
+    ```
+    func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+      username := d.Get("username").(string)
+      password := d.Get("password").(string)
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      if (username != "") && (password != "") {
+        c, err := hashicups.NewClient(nil, &username, &password)
+        if err != nil {
+          return nil, diag.FromErr(err)
+        }
+
+        return c, diags
+      }
+
+      c, err := hashicups.NewClient(nil, nil, nil)
+      if err != nil {
+        return nil, diag.FromErr(err)
+      }
+
+      return c, diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice that the function is able to retrieve the `username` and `password` values from the `*schema.ResourceData`.
+    The HashiCups API client is a simple API wrapper for the HashiCups API.
+
+    By returning the HashiCups API client, the provider will be able to access the API client as a `meta` input
+    parameter. You will use the `meta` input parameter to access a protected endpoint (`/orders`) later in this track.
+
+    *Test the provider*
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Take a look at the `main.tf` file.
+
+    ```
+    cat main.tf
+    ```
+
+    Then, authenticate your provider. You can either set them via environment variables (recommended) or update your
+    provider block. Find an example using environment variables below.
+
+    ```
+    export HASHICUPS_USERNAME=education
+    export HASHICUPS_PASSWORD=test123
+    ```
+
+    Add these to your `.bashrc` for later usage.
+
+    ```
+    echo "export HASHICUPS_USERNAME=education" >> ~/.bashrc
+    echo "export HASHICUPS_PASSWORD=test123" >> ~/.bashrc
+    ```
+
+    Finally, initialize your workspace to refresh your HashiCups provider, then apply.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    Check the terminal containing your HashiCups logs for the recorded operations invoked by the HashiCups provider.
+
+    ```
+    cd ../docker_compose
+    docker-compose logs | grep signin
+    ```
+
+    The provider should have invoked a request to the `signin `endpoint. You should see a line that looks like the below.
+
+    ```
+    api_1  | 2021-04-13T21:14:38.844Z [INFO]  Handle User | signin
+    ```
+
+    Congratulations! You have added authentication to your HashiCups provider.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: implement-a-complex-read
+  id: bcwthxrik7le
+  type: challenge
+  title: Implement a Complex Read
+  teaser: Learn to read from an auth protected endpoint with a Terraform Provider.
+  notes:
+  - type: text
+    contents: |-
+      In this challenge, you will retrieve an order, a protected endpoint,
+      to verify whether a Terraform provider that interacts with the API of the HashiCups
+      coffee shop application, has been authenticated to the API successfully.
+      The order schema contains nested objects, making it a more complicated data
+      structure than the previously defined coffee data source.
+  - type: text
+    contents: |-
+      To do this, you will:
+
+      - *Create a new order via API* There must be an existing order for you to retrieve it.
+      - *Define order data source.* You will add a scaffold that defines an empty schema and functions to retrieve order information.
+      - *Define order schema.* The schema reflects the response from invoking the `/order/{orderId}` endpoint. The `order` schema is considered complex because it nests a list of `OrderItems`.
+      - *Implement complex read.*  This read functionality uses multiple nesting functions to flatten the response from `/order/{orderId}` and map it to the `order` schema.
+      - *Add order data source to the provider schema.* This allows you to use the data source in your configuration.
+  assignment: |-
+    *Create an order via API*
+
+    Before you can query a user's order, you must first create an order.
+
+    ```
+    curl -X POST -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders -d '[{"coffee": { "id":1 }, "quantity":4}, {"coffee": { "id":3 }, "quantity":3}]'
+    ```
+
+    Query the order using the order ID you received in the response above as a HTML parameter
+    (`localhost:19090/orders/{orderID}`). The response should be the same as the response above.
+
+    ```
+    curl -X GET -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders/1
+    ```
+
+    *Define `order` data resource*
+
+    Now, create a file named `hashicups/data_source_order.go` in your `hashicups` directory and add the following
+    snippet.
+
+    ```
+    package hashicups
+
+    import (
+      "context"
+      "strconv"
+
+      hc "github.com/hashicorp-demoapp/hashicups-client-go"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    )
+
+    func dataSourceOrder() *schema.Resource {
+      return &schema.Resource{
+        ReadContext: dataSourceOrderRead,
+        Schema: map[string]*schema.Schema{
+          "id": &schema.Schema{
+            Type:     schema.TypeInt,
+            Required: true,
+          },
+          "items": &schema.Schema{
+            Type:     schema.TypeList,
+            Computed: true,
+            Elem: &schema.Resource{
+              Schema: map[string]*schema.Schema{
+                "coffee_id": &schema.Schema{
+                  Type:     schema.TypeInt,
+                  Computed: true,
+                },
+                "coffee_name": &schema.Schema{
+                  Type:     schema.TypeString,
+                  Computed: true,
+                },
+                "coffee_teaser": &schema.Schema{
+                  Type:     schema.TypeString,
+                  Computed: true,
+                },
+                "coffee_description": &schema.Schema{
+                  Type:     schema.TypeString,
+                  Computed: true,
+                },
+                "coffee_price": &schema.Schema{
+                  Type:     schema.TypeInt,
+                  Computed: true,
+                },
+                "coffee_image": &schema.Schema{
+                  Type:     schema.TypeString,
+                  Computed: true,
+                },
+                "quantity": &schema.Schema{
+                  Type:     schema.TypeInt,
+                  Computed: true,
+                },
+              },
+            },
+          },
+        },
+      }
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice how the schema mirrors the JSON response — only `id` and `items` exist on the top level.
+
+      - The `id` is *required* because an order ID must be set so the data source knows which order to retrieve.
+      - The `items` schema is a [computed](https://www.terraform.io/docs/extend/schemas/schema-behaviors.html#computed) list (`schema.TypeList`) of objects (`schema.Resource`) containing `coffee` attributes and `quantity`.
+      - The `coffee` attributes is flattened and mapped accordingly (`coffee.id` is mapped to `coffee_id`, etc...)
+
+    You will learn an alternative method to nest maps in a later challenge "Implement Create", when you create new orders.
+
+    *Implement complex read*
+
+    Now that you have defined the `order` schema, add the `dataSourceOrderRead` function to
+    `hashicups/data_source_order.go`. This function will retrieve the `order` and map its values to the order schema
+    defined above.
+
+    ```
+    func dataSourceOrderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      c := m.(*hc.Client)
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      orderID := strconv.Itoa(d.Get("id").(int))
+
+      order, err := c.GetOrder(orderID)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+
+      orderItems := flattenOrderItemsData(&order.Items)
+      if err := d.Set("items", orderItems); err != nil {
+        return diag.FromErr(err)
+      }
+
+      d.SetId(orderID)
+
+      return diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice the `m` (meta) input parameter contains the HashiCups API Client set by the `ConfigureContextFunc` defined
+    in the previous challenge. If provider uses an unauthenticated API Client, this function will fail and return an
+    error message.
+
+    The API Client's `GetOrder` function returns an order object. However, you must flatten this response to accurately
+    map the response to the `order` schema. An order consists of an order ID and a list of coffee objects and their
+    respective quantities. As a result, the order object must go through one flattening function to populate the list
+    of coffee objects and their quantities.
+
+    Add the `flattenOrderItemsData` function to your `hashicups/data_source_order.go` file. This returns a list of
+    order items.
+
+    ```
+    func flattenOrderItemsData(orderItems *[]hc.OrderItem) []interface{} {
+      if orderItems != nil {
+        ois := make([]interface{}, len(*orderItems), len(*orderItems))
+
+        for i, orderItem := range *orderItems {
+          oi := make(map[string]interface{})
+
+          oi["coffee_id"] = orderItem.Coffee.ID
+          oi["coffee_name"] = orderItem.Coffee.Name
+          oi["coffee_teaser"] = orderItem.Coffee.Teaser
+          oi["coffee_description"] = orderItem.Coffee.Description
+          oi["coffee_price"] = orderItem.Coffee.Price
+          oi["coffee_image"] = orderItem.Coffee.Image
+          oi["quantity"] = orderItem.Quantity
+
+          ois[i] = oi
+        }
+
+        return ois
+      }
+
+      return make([]interface{}, 0)
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    The `flattenOrderItemsData` function takes an `*[]hc.OrderItem` as `orderItems`. If `orderItems` is not `nil`, it
+    will iterate through the slice and map its values into a `map[string]interface{}`. Notice how the function assigns
+    the coffee attributes directly to its corresponding flattened attribute (`orderItem.Coffee.ID` -> `coffee_id`).
+
+    *Add data source to provider*
+
+    Now that you've defined the `order` data source, you can add it to your provider.
+
+    In your `hashicups/provider.go` file, add the `order` data source to the `DataSourcesMap` of your `Provider()`
+    function. Resources and data sources names must follow the `<provider>_<resource_name>` convention.
+
+    ```
+    // Provider -
+    func Provider() *schema.Provider {
+      return &schema.Provider{
+        Schema: map[string]*schema.Schema{
+          "username": &schema.Schema{
+            Type:        schema.TypeString,
+            Optional:    true,
+            DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_USERNAME", nil),
+          },
+          "password": &schema.Schema{
+            Type:        schema.TypeString,
+            Optional:    true,
+            Sensitive:   true,
+            DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_PASSWORD", nil),
+          },
+        },
+        ResourcesMap: map[string]*schema.Resource{},
+        DataSourcesMap: map[string]*schema.Resource{
+            "hashicups_coffees":     dataSourceCoffees(),
+    +       "hashicups_order":       dataSourceOrder(),
+        },
+        ConfigureContextFunc: providerConfigure,
+      }
+    }
+    ```
+
+    *Test the provider*
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Add the following Terraform configuration to `main.tf`.
+
+    ```
+    data "hashicups_order" "order" {
+      id = 1
+    }
+
+    output "order" {
+      value = data.hashicups_order.order
+    }
+    ```
+
+    Finally, initialize your workspace to refresh your HashiCups provider, then apply. Notice how the coffee attributes
+    are flattened.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    This should return the first order in your output.
+
+    ```
+    Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+
+    Outputs:
+
+    order = {
+      "id" = 1
+      "items" = [
+        {
+          "coffee_description" = ""
+          "coffee_id" = 1
+          "coffee_image" = "/packer.png"
+          "coffee_name" = "Packer Spiced Latte"
+          "coffee_price" = 350
+          "coffee_teaser" = "Packed with goodness to spice up your images"
+          "quantity" = 4
+        },
+        {
+          "coffee_description" = ""
+          "coffee_id" = 3
+          "coffee_image" = "/nomad.png"
+          "coffee_name" = "Nomadicano"
+          "coffee_price" = 150
+          "coffee_teaser" = "Drink one today and you will want to schedule another"
+          "quantity" = 3
+        },
+      ]
+    }
+    ```
+
+    At any time, you can see the provider schema using the `terraform` command below as well.
+
+    ```
+    terraform providers schema -json | jq .
+    ```
+
+    Congratulations! You have implemented a nested read function.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: debug-a-terraform-provider
+  id: pq4kpsszirwi
+  type: challenge
+  title: Debug a Terraform Provider
+  teaser: Learn to add custom error messages to a Terraform provider.
+  notes:
+  - type: text
+    contents: |-
+      In this challenge, you will add custom error messages to a Terraform provider that interacts with the API of the
+      HashiCups coffee shop application, and view detailed Terraform provider logs.
+  assignment: |-
+    *Update error messages*
+
+    In your `hashicups/provider.go` file, the `providerConfigure` function returns an `interface{}` and a
+    `diag.Diagnostics` type. `diag.Diagnostics` can return multiple errors and warnings to Terraform, giving users more
+    robust error and warning messages.
+
+    ```
+    func providerConfigure(...) (interface{}, diag.Diagnostics) {
+      ...
+    }
+    ```
+
+    The `diag.FromError()` function casts standard Go errors to `diag.Diagnostics` type notifying the user whenever the
+    provider errors.
+
+    Replace the `return nil, diag.FromError(err)` line in your `providerConfigure` function with the following code
+    snippet. There should be two replacements — one where the user's HashiCups credentials provided and the other
+    where its not. Notice how this appends a `diag.Diagnostic` type to the existing `diags` variable; this allows your
+    provider to return multiple error message. This will produce an error message containing Summary and Detail contents.
+
+    ```
+    diags = append(diags, diag.Diagnostic{
+      Severity: diag.Error,
+      Summary:  "Unable to create HashiCups client",
+      Detail:   "Unable to auth user for authenticated HashiCups client",
+    })
+
+    return nil, diags
+    ```
+
+    Your `providerConfigure` function should look like the following.
+
+    ```
+    func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+      username := d.Get("username").(string)
+      password := d.Get("password").(string)
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      if (username != "") && (password != "") {
+        c, err := hashicups.NewClient(nil, &username, &password)
+        if err != nil {
+    -     return nil, diag.FromErr(err)
+    +     diags = append(diags, diag.Diagnostic{
+    +       Severity: diag.Error,
+    +       Summary:  "Unable to create HashiCups client",
+    +       Detail:   "Unable to auth user for authenticated HashiCups client",
+    +     })
+    +     return nil, diags
+        }
+
+        return c, diags
+      }
+
+      c, err := hashicups.NewClient(nil, nil, nil)
+      if err != nil {
+    -   return nil, diag.FromErr(err)
+    +   diags = append(diags, diag.Diagnostic{
+    +     Severity: diag.Error,
+    +     Summary:  "Unable to create HashiCups client",
+    +     Detail:   "Unable to auth user for unauthenticated HashiCups client",
+    +   })
+    +   return nil, diags
+      }
+
+      return c, diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice how the Diagnostic severity is set to `diag.Error`. There are two [levels of severity](https://pkg.go.dev/github.com/hashicorp/terraform-config-inspect/tfconfig?utm_source=godoc#DiagSeverity) —
+    `diag.Error` and `diag.Warning`. You will create and view a warning message in the next section.
+
+    *Test error message*
+
+    Now that you've added a custom error message, verify that the provider returns your error message.
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Update your `HASHICUPS_USERNAME` and `HASHICUPS_PASSWORD` env vars so they use the wrong credentials.
+
+    ```
+    export HASHICUPS_USERNAME=education
+    export HASHICUPS_PASSWORD=test1234
+    ```
+
+    Next, initialize your workspace to refresh your HashiCups provider, then apply.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    This should return the error message you defined above.
+
+    ```
+    ## Output truncated...
+    module.psl.data.hashicups_coffees.all: Refreshing state...
+
+    Error: Unable to create HashiCups client
+
+    Unable to auth user for authenticated HashiCups client
+    ```
+
+    Because your provider errors, your Terraform state doesn't update when you ran the terraform apply.
+
+    *Add warning message*
+
+    Add the following snippet after diags is declared in `providerConfigure` function.
+
+    ```
+    diags = append(diags, diag.Diagnostic{
+      Severity: diag.Warning,
+      Summary:  "Warning Message Summary",
+      Detail:   "This is the detailed warning message from providerConfigure",
+    })
+    ```
+
+    Your `providerConfigure` function should look like the following.
+
+    ```
+    func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+      ...
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+    + diags = append(diags, diag.Diagnostic{
+    +   Severity: diag.Warning,
+    +   Summary:  "Warning Message Summary",
+    +   Detail:   "This is the detailed warning message from providerConfigure",
+    + })
+
+      ...
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice that you have set the Diagnostic's severity to `diag.Warning`. When you use your provider, both warning and
+    messages appear because diags contains both. A warning message will only appear when the provider also errors.
+
+    The Diagnostic's detail contains additional information about the warning message, including which function it was
+    triggered in. This could provide handy while debugging.
+
+    *Test warning message*
+
+    Now that you've added a warning message and updated your Terraform log level, verify that the provider returns
+    both your warning and error message.
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Next, initialize your workspace to refresh your HashiCups provider, then apply.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    This should return both a warning and error message.
+
+    ```
+    ## Output truncated...
+    module.psl.data.hashicups_coffees.all: Refreshing state...
+
+    Warning: Warning Message Summary
+
+    This is the detailed warning message from providerConfigure
+
+
+    Error: Unable to create HashiCups client
+
+    Unable to authenticate user for authenticated HashiCups client
+    ```
+
+    Because your provider errors, your Terraform state doesn't update when you ran the terraform apply.
+
+    *Fix provider*
+
+    Comment out or remove the warning message, then recompile your Terraform provider.
+
+    ```
+    func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+      ...
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+    - diags = append(diags, diag.Diagnostic{
+    -   Severity: diag.Warning,
+    -   Summary:  "Warning Message Summary",
+    -   Detail:   "This is the detailed warning message from providerConfigure",
+    - })
+
+      ...
+    }
+    ```
+
+    Fix your Terraform configuration to use the correct credentials.
+
+    Update your `HASHICUPS_USERNAME` and `HASHICUPS_PASSWORD` env vars so they use the right credentials again.
+
+    ```
+    export HASHICUPS_USERNAME=education
+    export HASHICUPS_PASSWORD=test123
+    ```
+
+    Finally, re-initializing your workspace and applying the configuration.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    This should succeed.
+
+    ```
+    Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+    ```
+
+    There should be no errors or warning messages.
+
+    _Tip: You can also retrieve detailed Terraform and provider logs by setting the environment variable `TF_LOG`.
+    Please include a detailed logs with any bug reports so the author can identify and address the bug. To learn more
+    about log levels and how to interpret a crash log, refer to the
+    [Debugging Terraform Documentation](https://www.terraform.io/docs/internals/debugging.html)._
+
+    Congratulations! You have added error and warning messages to your HashiCups provider and implemented a nested read function.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: implement-create
+  id: sfluifh0t6vq
+  type: challenge
+  title: Implement Create
+  teaser: Learn to create an `order` resource with a Terraform provider.
+  notes:
+  - type: text
+    contents: |-
+      In this challenge, you will create an `order` resource for a Terraform provider that interacts with the API of a
+      coffee shop application, HashiCups. Then, you will use the schema to create a new order and populate
+      the order.
+  - type: text
+    contents: |-
+      To do this, you will:
+
+      - *Define `order` resource.* You will add a scaffold that defines an empty schema and functions to create, read, update and delete orders.
+      - *Define `order` schema.* The schema contains fields used to create a new order and retrieved by the read functionality.
+      - *Add create functionality.* The create function invokes a `POST` request to `/orders` to create a new order.
+      - *Add read functionality.* The read function invokes a `GET` request to `/orders/{orderID}` to retrieve the order's data. The orders schema contains a nested object, therefore you will use multiple flattening functions to map the response to the `order` schema.
+      - *Add `order` resource to the provider schema.* This allows you to use the resource in your configuration.
+  assignment: |-
+    *Define `order` resource*
+
+    Add the following code snippet to a new file named `hashicups/resource_order.go` in the `hashicups` directory. As
+    a general convention, Terraform providers put each resource in their own file, named after the resource, prefixed
+    with `resource_`.
+
+    ```
+    package hashicups
+
+    import (
+      "context"
+
+      "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    )
+
+    func resourceOrder() *schema.Resource {
+      return &schema.Resource{
+        CreateContext: resourceOrderCreate,
+        ReadContext:   resourceOrderRead,
+        UpdateContext: resourceOrderUpdate,
+        DeleteContext: resourceOrderDelete,
+        Schema: map[string]*schema.Schema{},
+      }
+    }
+
+    func resourceOrderCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      return diags
+    }
+
+    func resourceOrderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      return diags
+    }
+
+    func resourceOrderUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      return resourceOrderRead(ctx, d, m)
+    }
+
+    func resourceOrderDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      return diags
+    }
+    ```
+
+    This serves as a scaffold for the `order` resource. Notice, the order resource defines create, read, update and
+    delete (CRUD) functionality. In this challenge, you will only implement create and read to create and read a new
+    `order` resource.
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    *Define `order` schema*
+
+    To create a HashiCups order, you would send a POST request to the `/orders` endpoint with a list of `OrderItems`,
+    containing the coffee object and its respective quantity. You have some experience creating orders from a previous
+    challenge.
+
+    ```
+    curl -X POST -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders -d '[{"coffee": { "id":1 }, "quantity":4}, {"coffee": { "id":3 }, "quantity":3}]'
+    ```
+
+    Replace the line `Schema: map[string]*schema.Schema{}`, in your `resourceOrder` function with the following schema.
+    The `order` resource schema should resemble the request body.
+
+    ```
+    Schema: map[string]*schema.Schema{
+      "items": &schema.Schema{
+        Type:     schema.TypeList,
+        Required: true,
+        Elem: &schema.Resource{
+          Schema: map[string]*schema.Schema{
+            "coffee": &schema.Schema{
+              Type:     schema.TypeList,
+              MaxItems: 1,
+              Required: true,
+              Elem: &schema.Resource{
+                Schema: map[string]*schema.Schema{
+                  "id": &schema.Schema{
+                    Type:     schema.TypeInt,
+                    Required: true,
+                  },
+                  "name": &schema.Schema{
+                    Type:     schema.TypeString,
+                    Computed: true,
+                  },
+                  "teaser": &schema.Schema{
+                    Type:     schema.TypeString,
+                    Computed: true,
+                  },
+                  "description": &schema.Schema{
+                    Type:     schema.TypeString,
+                    Computed: true,
+                  },
+                  "price": &schema.Schema{
+                    Type:     schema.TypeInt,
+                    Computed: true,
+                  },
+                  "image": &schema.Schema{
+                    Type:     schema.TypeString,
+                    Computed: true,
+                  },
+                },
+              },
+            },
+            "quantity": &schema.Schema{
+              Type:     schema.TypeInt,
+              Required: true,
+            },
+          },
+        },
+      },
+    },
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    This `order` schema should be similar to the `order` data resource defined in the previous Implement Complex
+    Read challenge.
+
+    - The top level `id` attribute is missing in the `order` resource, but present in the `order` data resource. Unlike the `order` data source, you don't know the order ID ahead of time. When HashiCups provider invokes the HashiCups API, the API generates an order ID which is then assigned as the resource's ID by the HashiCups provider.
+    - `items` is a `required` field, *not* a computed one. This is because the `OrderItems` need to be defined to create an order.
+
+    There are multiple ways to nest maps.
+
+    - The first (see `coffee` object) is to define the nested object as an `schema.TypeList` with 1 item. This is currently the closest way to emulate a nested object.
+    - The second way is to use a [`schema.TypeMap`](https://www.terraform.io/docs/extend/schemas/schema-types.html#typemap). This method may be preferable if you only require a key value map of primitive types. However, you should use a validation function to enforce required keys.
+
+    Notice that the coffee object is represented as a `schema.TypeList` of one item. This method was selected because
+    it closely matches the coffee object returned in the response.
+
+    *Implement create*
+
+    Now that you have defined the order resource schema, replace the `resourceOrderCreate` function in
+    `hashicups/resource_order.go` with the following code snippet. This function will create a new HashiCups order and
+    Terraform resource.
+
+    ```
+    func resourceOrderCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      c := m.(*hc.Client)
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      items := d.Get("items").([]interface{})
+      ois := []hc.OrderItem{}
+
+      for _, item := range items {
+        i := item.(map[string]interface{})
+
+        co := i["coffee"].([]interface{})[0]
+        coffee := co.(map[string]interface{})
+
+        oi := hc.OrderItem{
+          Coffee: hc.Coffee{
+            ID: coffee["id"].(int),
+          },
+          Quantity: i["quantity"].(int),
+        }
+
+        ois = append(ois, oi)
+      }
+
+      o, err := c.CreateOrder(ois)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+
+      d.SetId(strconv.Itoa(o.ID))
+
+      return diags
+    }
+    ```
+
+    Since this uses `strconv` to convert the `ID` into a string, remember to import the `strconv` library. Replace the
+    `import` block with the one below.
+
+    ```
+    import (
+      "context"
+      "strconv"
+
+      hc "github.com/hashicorp-demoapp/hashicups-client-go"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    )
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice the `m` (meta) input parameter contains the HashiCups API Client set by the `ConfigureContextFunc` defined
+    above. If an unauthenticated API Client is provided (no username/password), this function will fail and return an
+    error message.
+
+    The function retrieves the order attributes using `d.Get("items")` — order items are located in `items` as defined
+    in the schema — and typecasts it to a `[]interface{}`. Then, the function transforms the items into a slice of
+    `OrderItem`, a struct required by the HashiCups API client to create an order.
+
+    Finally, upon successful order creation, `SetID` sets the resource ID to the order ID. The resource ID must be a
+    non-blank string that can be used to read the resource again. If no ID is set, Terraform assumes the resource was
+    not created successfully; as a result, no state will be saved for that resource.
+
+    *Implement read*
+
+    Now that you have implemented create, you must implement read to retrieve the resource current state. This will be
+    run during the `plan` process to determine whether the resource needs to be updated.
+
+    Replace the `resourceOrderRead` function in `hashicups/resource_order.go` with the following code snippet.
+
+    ```
+    func resourceOrderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      c := m.(*hc.Client)
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      orderID := d.Id()
+
+      order, err := c.GetOrder(orderID)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+
+      orderItems := flattenOrderItems(&order.Items)
+      if err := d.Set("items", orderItems); err != nil {
+        return diag.FromErr(err)
+      }
+
+      return diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    This function should be similar to the `dataSourceOrderRead` function in `hashicups/data_resource_order.go` with
+    two significant change.
+
+    - The order resource's read function (`resourceOrderRead`) uses `d.ID()` as the order ID. The `order` data resource's read function (`dataSourceOrderRead`) uses an order ID provided by the user.
+    - The function uses `flattenOrderItems` instead of `flattenOrderItemsData` because the `order` resource and the `order` data source use different schemas. You will define the `flattenOrderItems` in the next section.
+
+    *Add flattening functions*
+
+    The API Client's `GetOrder` function returns an order object that needs to be "flattened" so the provider can
+    accurately map it to the order `schema`. An order consists of an order ID and a list of coffee objects and their
+    respective quantities.
+
+    As a result, it must go through two flattening functions:
+
+    - The first flattening function populates the list of coffee objects and their quantities
+    - The second flattening function populates the actual coffee object itself.
+
+    Add the following function to your `hashicups/resource_order.go` file. This is the first flattening function to
+    return a list of `order` items. The `flattenOrderItems` function takes an `*[]hc.OrderItem` as `orderItems`. If
+    `orderItems` is not `nil`, it will iterate through the slice and map its values into a `map[string]interface{}`.
+
+    ```
+    func flattenOrderItems(orderItems *[]hc.OrderItem) []interface{} {
+      if orderItems != nil {
+        ois := make([]interface{}, len(*orderItems), len(*orderItems))
+
+        for i, orderItem := range *orderItems {
+          oi := make(map[string]interface{})
+
+          oi["coffee"] = flattenCoffee(orderItem.Coffee)
+          oi["quantity"] = orderItem.Quantity
+          ois[i] = oi
+        }
+
+        return ois
+      }
+
+      return make([]interface{}, 0)
+    }
+    ```
+
+    Then, add the second flattening function, `flattenCoffee`, to your `hashicups/resource_order.go` file. This is
+    called in the first flattening function. It takes a `hc.Coffee` and retturns a slice with a single object. Notice
+    how this mirrors the coffee schema — a `schema.TypeList` with a maximum of one item.
+
+    ```
+    func flattenCoffee(coffee hc.Coffee) []interface{} {
+      c := make(map[string]interface{})
+      c["id"] = coffee.ID
+      c["name"] = coffee.Name
+      c["teaser"] = coffee.Teaser
+      c["description"] = coffee.Description
+      c["price"] = coffee.Price
+      c["image"] = coffee.Image
+
+      return []interface{}{c}
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    *Add read function to create function*
+
+    Finally, add `resourceOrderRead` to the bottom of your `resourceOrderCreate` function. This will populate the
+    Terraform state to its current state after the resource creation.
+
+    ```
+    func resourceOrderCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      // ...
+
+      d.SetId(strconv.Itoa(o.ID))
+
+    + resourceOrderRead(ctx, d, m)
+
+      return diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    *Add `order` resource to provider*
+
+    Now that you've defined the `order` resource, you can add it to your provider.
+
+    In your `hashicups/provider.go` file, add the `order` resource to the `ResourceMap`. Resources and data sources
+    names must follow the `<provider>_<resource_name>` convention.
+
+    ```
+    // Provider -
+    func Provider() *schema.Provider {
+      return &schema.Provider{
+        Schema: map[string]*schema.Schema{
+          "username": &schema.Schema{
+            Type:        schema.TypeString,
+            Optional:    true,
+            DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_USERNAME", nil),
+          },
+          "password": &schema.Schema{
+            Type:        schema.TypeString,
+            Optional:    true,
+            Sensitive:   true,
+            DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_PASSWORD", nil),
+          },
+        },
+        ResourcesMap: map[string]*schema.Resource{
+    +     "hashicups_order": resourceOrder(),
+        },
+        DataSourcesMap: map[string]*schema.Resource{
+          "hashicups_coffees":     dataSourceCoffees(),
+          "hashicups_order":       dataSourceOrder(),
+        },
+        ConfigureContextFunc: providerConfigure,
+      }
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    *Test the provider*
+
+    Now that you've created the order resource with create and read capabilities, verify that it works.
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Add the following Terraform configuration to main.tf.
+
+    ```
+    resource "hashicups_order" "edu" {
+      items {
+        coffee {
+          id = 3
+        }
+        quantity = 2
+      }
+      items {
+        coffee {
+          id = 2
+        }
+        quantity = 2
+      }
+    }
+
+    output "edu_order" {
+      value = hashicups_order.edu
+    }
+    ```
+
+    Then, initialize your workspace to refresh your HashiCups provider then. This should create an order and
+    return its values in your output.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    You should see output like the below.
+
+    ```
+    Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+    ```
+
+    Congratulations! You have created the order resource with create and read capabilities.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: implement-update
+  id: on5qwvfur9xr
+  type: challenge
+  title: Implement Update
+  teaser: Learn to add update capabilities to the order resource of a Terraform provider.
+  notes:
+  - type: text
+    contents: |-
+      In this challenge, you will add update capabilities to the order resource of a provider that interacts with the
+      HashiCups coffee shop application API.
+  - type: text
+    contents: |-
+      To do this, you will:
+
+      - *Update your schema.* Add a `last_updated` attribute to the `order` schema. This attribute will update to the current date time whenever the order resource is updated.
+      - *Implement update.* This update function invokes a `PUT` request to the `/orders/{orderId}` endpoint with the update order items in the request body. After the update function runs, it invokes `resourceOrderRead` to retrieve the order's updated values.
+  assignment: |-
+    *Update schema*
+
+    In `hashicups/resource_order.go`, update your order schema to include a parameter named `last_updated`.
+
+    ```
+    "last_updated": &schema.Schema{
+      Type:     schema.TypeString,
+      Optional: true,
+      Computed: true,
+    },
+    ```
+
+    Your `order` schema should look like the following.
+
+    ```
+    func resourceOrder() *schema.Resource {
+      return &schema.Resource{
+        ...
+        Schema: map[string]*schema.Schema{
+    +     "last_updated": &schema.Schema{
+    +       Type:     schema.TypeString,
+    +       Optional: true,
+    +       Computed: true,
+    +     },
+          "items": &schema.Schema{
+            ...
+          },
+          ...
+        },
+      },
+    }
+    ```
+
+    *Implement update*
+
+    Now that you have defined the `order` resource schema, replace the `resourceOrderUpdate` function in
+    `hashicups/resource_order.go` with the following code snippet. This function will update the order resource if
+    there are any changes to the order items.
+
+    ```
+    func resourceOrderUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      c := m.(*hc.Client)
+
+      orderID := d.Id()
+
+      if d.HasChange("items") {
+        items := d.Get("items").([]interface{})
+        ois := []hc.OrderItem{}
+
+        for _, item := range items {
+          i := item.(map[string]interface{})
+
+          co := i["coffee"].([]interface{})[0]
+          coffee := co.(map[string]interface{})
+
+          oi := hc.OrderItem{
+            Coffee: hc.Coffee{
+              ID: coffee["id"].(int),
+            },
+            Quantity: i["quantity"].(int),
+          }
+          ois = append(ois, oi)
+        }
+
+        _, err := c.UpdateOrder(orderID, ois)
+        if err != nil {
+          return diag.FromErr(err)
+        }
+
+        d.Set("last_updated", string(time.Now().Format(time.RFC850)))
+      }
+
+      return resourceOrderRead(ctx, d, m)
+    }
+    ```
+
+    Notice the `m` (meta) input parameter contains the HashiCups API Client set by the `ConfigureContextFunc` defined
+    above. If an unauthenticated API Client is provided (no username/password), this function will fail and return
+    an error message.
+
+    The function determines whether there are discrepancies in the `items` property between the configuration and
+    the state.
+
+    _Tip: The `hasChange()` function enables you to invoke different APIs or build a targeted request body to update
+    your resource when a specific property changes._
+
+    If there are discrepancies, the function will update the order with the new configuration. Then, it will update
+    the `last_updated` attribute to the current timestamp. Finally, it will call `resourceOrderRead` to update the
+    resource's state.
+
+    _Note: Update functions rarely update the resource ID. However, if the ID becomes blank during the update process,
+    the provider assumes the resource is destroyed and all state is removed._
+
+    Remember to import the time library.
+
+    ```
+    import (
+      "context"
+      "strconv"
+    + "time"
+
+      hc "github.com/hashicorp-demoapp/hashicups-client-go"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+      "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    )
+    ```
+
+    *Test the provider*
+
+    Now that you've added update capabilities to the `order` resource, verify that it works.
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Update your `hashicups_order.edu` resource in `main.tf`.
+
+    ```
+    resource "hashicups_order" "edu" {
+      items {
+        coffee {
+          id = 3
+        }
+        quantity = 2
+      }
+      items {
+        coffee {
+          id = 2
+        }
+    -   quantity = 2
+    +   quantity = 3
+      }
+    }
+    ```
+
+    Apply the configuration. This should update your order and set the `last_updated` attribute.
+
+    ```
+    terraform init && terraform apply --auto-approve
+    ```
+
+    Notice in the apply output, you can see `1 changed`.
+
+    Verify that the provider updated your order by invoking the HashiCups API. Substitute the order number with your
+    order ID and the auth token with your auth token.
+
+    ```
+    curl -X GET -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders/<order_id>
+    ```
+
+    Congratulations! You have added update capabilities to the order resource.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: implement-delete
+  id: pjionakyoqpj
+  type: challenge
+  title: Implement Delete
+  teaser: Learn to add delete capabilities to the order resource for a Terraform provider.
+  notes:
+  - type: text
+    contents: |-
+      In this challenge, you will add delete capabilities to the `order` resource
+      for a Terraform provider that interacts with the API of the HashiCups coffee shop
+      application. To do this, you will implement delete. This delete function
+      invokes a `DELETE` request to the `/orders/{orderId}` endpoint.
+  assignment: |-
+    *Implement delete*
+
+    Replace the `resourceOrderDelete` function in `hashicups/resource_order.go` with the code snippet below. This
+    function will delete the HashiCups order and Terraform resource.
+
+    ```
+    func resourceOrderDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+      c := m.(*hc.Client)
+
+      // Warning or errors can be collected in a slice type
+      var diags diag.Diagnostics
+
+      orderID := d.Id()
+
+      err := c.DeleteOrder(orderID)
+      if err != nil {
+        return diag.FromErr(err)
+      }
+
+      // d.SetId("") is automatically called assuming delete returns no errors, but
+      // it is added here for explicitness.
+      d.SetId("")
+
+      return diags
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice the `m` (meta) input parameter contains the HashiCups API Client set by the `ConfigureContextFunc` defined
+    above. If an unauthenticated API Client is provided (no username/password), this function will fail and return an
+    error message.
+
+    The function retrieves the order ID using `d.ID()` and deletes the order.
+
+    - If the `DeleteOrder` callback returns *without* an error, the provider assumes the resource is destroyed and all state is removed.
+    - If the `DeleteOrder` callback returns *with* an error, the provider assumes the resource still exists and all prior state is preserved.
+
+    The `DeleteOrder` callback should never update any state on the resource. In addition, the `DeleteOrder` callback
+    should always handle the case where the resource might already be destroyed. If the resource is already destroyed,
+    the destroy function should not return an error. If the target API doesn't have this functionality, the destroy
+    function should verify the resource exists; if the resource does not exist, set the resource ID to "". This
+    behavior allows Terraform users to manually delete resources without breaking Terraform.
+
+    *Test the provider*
+
+    Now that you've added delete capabilities to the `order` resource, verify that it works.
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Initialize your workspace to refresh your HashiCups provider then destroy the configuration. This should delete
+    your HashiCups order.
+
+    ```
+    terraform init && terraform destroy --auto-approve
+    ```
+
+    Verify that the provider deleted your order by invoking the HashiCups API. Substitute the order number with your
+    order ID and the auth token with your auth token.
+
+    ```
+    curl -X GET -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders/<order_id>
+    ```
+
+    You should see the below output.
+
+    ```
+    {}
+    ```
+
+    Congratulations! You have added delete capabilities to the order resource.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 900
+- slug: implement-import
+  id: wwco2dpljowt
+  type: challenge
+  title: Implement Import
+  teaser: Learn to add import capabilities to the order resource for a Terraform provider.
+  notes:
+  - type: text
+    contents: In this challenge, you will add import capabilities to the `order` resource of the HashiCups Terraform provider, which interacts with the HashiCups coffee shop application API. To do this, you will implement a `ResourceImporter()` function. This function retrieves an existing HashiCups order and brings it into Terraform state, enabling Terraform to manage it.
+  assignment: |-
+    *Implement import*
+
+    In `hashicups/resource_order.go`, add the following `Importer` attribute to the end of the `resourceOrder()` schema.
+
+    ```
+    func resourceOrder() *schema.Resource {
+      return &schema.Resource{
+        # ..
+        Schema: map[string]*schema.Schema{
+          # ..
+        },
+    +   Importer: &schema.ResourceImporter{
+    +      StateContext: schema.ImportStatePassthroughContext,
+    +   },
+      }
+    }
+    ```
+
+    Format your code.
+
+    ```
+    go fmt ./...
+    ```
+
+    Notice that `StateContext` is set to `schema.ImportStatePassthroughContext`. When you invoke the import command,
+    you provide the order ID in the command. For example:
+
+    ```
+    terraform import hashicups_order.sample <order_id>
+    ```
+
+    Terraform passes the `order_id` value to the read function (`resourceOrderRead`), which then populates the
+    resource's (`hashicups_order.sample`) state. This is the preferred method but requires a `Read` function that can
+    retrieve the entire resource state using `d.Id()` only.
+
+    _Tip: This import method highlights the importance of selecting a descriptive and unique resource ID. A good
+    resource ID can retrieve the resource state via API. In some cases, you can construct an ID from multiple
+    attributes (for example, `<region>:<resource_id>`)._
+
+    *Test the provider*
+
+    Test the new provider capability by importing an order resource.
+
+    Install the provider binary.
+
+    ```
+    make instruqt_install
+    ```
+
+    Navigate to the `terraform-provider-hashicups/examples` directory. This contains a sample Terraform configuration
+    for the Terraform HashiCups provider.
+
+    ```
+    cd examples
+    ```
+
+    Then, create a new directory named import and navigate to it.
+
+    ```
+    mkdir import && cd import
+    ```
+
+    In order to import into a Terraform configuration, you'll need to have the Terraform configuration already written.
+
+    Create a new file named `main.tf` with the following configuration. You will import an existing HashiCups order
+    into the `hashicups_order.sample` resource.
+
+    ```
+    terraform {
+      required_providers {
+        hashicups = {
+          version = "0.3"
+          source  = "hashicorp.com/edu/hashicups"
+        }
+      }
+    }
+
+    provider "hashicups" {
+      username = "education"
+      password = "test123"
+    }
+
+    resource "hashicups_order" "sample" {}
+
+    output "sample_order" {
+      value = hashicups_order.sample
+    }
+    ```
+
+    Initialize your workspace.
+
+    ```
+    terraform init
+    ```
+
+    Create an order via the HashiCups API. Take note of the order `id` in the response; the one below is `3`. This will
+     be the order number you import into `hashicups_order.sample`.
+
+    ```
+    curl -X POST -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders -d '[{"coffee": { "id":1 }, "quantity":4}, {"coffee": { "id":3 }, "quantity":3}]' | jq .
+    ```
+
+    The output should look like the below.
+
+    ```
+    {
+      "id": 4,
+      "items": [
+        {
+          "coffee": {
+            "id": 1,
+            "name": "Packer Spiced Latte",
+            "teaser": "Packed with goodness to spice up your images",
+            "description": "",
+            "price": 350,
+            "image": "/packer.png",
+            "ingredients": null
+          },
+          "quantity": 4
+        },
+        {
+          "coffee": {
+            "id": 3,
+            "name": "Nomadicano",
+            "teaser": "Drink one today and you will want to schedule another",
+            "description": "",
+            "price": 150,
+            "image": "/nomad.png",
+            "ingredients": null
+          },
+          "quantity": 3
+        }
+      ]
+    }
+    ```
+
+    Import the order into Terraform. Replace the `order_id` with the Order ID returned from the API above.
+
+    ```
+    terraform import hashicups_order.sample <order_id>
+    ```
+
+    The output should look like the below.
+
+    ```
+    hashicups_order.sample: Importing from ID "4"...
+    hashicups_order.sample: Import prepared!
+      Prepared hashicups_order for import
+    hashicups_order.sample: Refreshing state... [id=4]
+    Import successful!
+    The resources that were imported are shown above. These resources are now in
+    your Terraform state and will henceforth be managed by Terraform.
+    ```
+
+    Use the `state` subcommand to verify Terraform successfully imported the HashiCups order.
+
+    ```
+    terraform state show hashicups_order.sample
+    ```
+
+    The output should look like the below.
+
+    ```
+    # hashicups_order.sample:
+    resource "hashicups_order" "sample" {
+        id = "4"
+        items {
+            quantity = 4
+            coffee {
+                id     = 1
+                image  = "/packer.png"
+                name   = "Packer Spiced Latte"
+                price  = 350
+                teaser = "Packed with goodness to spice up your images"
+            }
+        }
+        items {
+            quantity = 3
+            coffee {
+                id     = 3
+                image  = "/nomad.png"
+                name   = "Nomadicano"
+                price  = 150
+                teaser = "Drink one today and you will want to schedule another"
+            }
+        }
+    }
+    ```
+
+    Congratulations! You have added import capabilities to the `order` resource.
+
+    Over the course of this track, you re-created the HashiCups provider and learned how to create data sources,
+    authenticate the provider to the HashiCups client, create resources with CRUD functionality, and import existing
+    resources.
+  tabs:
+  - title: VS Code
+    type: service
+    hostname: workstation
+    port: 8443
+  - title: Terminal
+    type: terminal
+    hostname: workstation
+  difficulty: advanced
+  timelimit: 7200
+checksum: "9070535760718183438"
