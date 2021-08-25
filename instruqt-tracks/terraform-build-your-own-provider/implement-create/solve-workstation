@@ -2,7 +2,7 @@
 
 # Check out the branch with all the correct files
 cd $PROJECT_HOME_DIR
-git checkout implement-create
+git checkout implement-create-instruqt
 
 # Create an order via the API
 curl -X POST -H "Authorization: ${HASHICUPS_TOKEN}" localhost:19090/orders -d '[{"coffee": { "id":1 }, "quantity":4}, {"coffee": { "id":3 }, "quantity":3}]'
