@@ -75,14 +75,14 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - main
       - terraform-build-your-own-provider:
           requires:
             - validate
           filters:
             branches:
               only:
-                - master
+                - main
   nightly-build:
     triggers:
       - schedule:
@@ -90,7 +90,7 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - main
     jobs:
       - validate
       - terraform-build-your-own-provider:
