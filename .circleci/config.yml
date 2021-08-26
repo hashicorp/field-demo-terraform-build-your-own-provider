@@ -28,13 +28,13 @@ jobs:
             for dir in $(ls -d /root/project/instruqt-tracks/*); do
               cd $dir && instruqt track validate
             done
-  terraform-col-iac:
+  terraform-build-your-own-provider:
     docker:
       - image: ubuntu:latest
     steps:
       - checkout
       - run:
-          name: Terraform Collaborative IAC
+          name: Terraform Build Your Own Provider Workshop
           command: |
             VERSION=$INSTRUQT_VERSION
             apt -y update
@@ -52,7 +52,7 @@ jobs:
             else
               echo "Instruqt is installed and updated to most recent version."
             fi
-            cd /root/project/instruqt-tracks/terraform-collaborative-iac
+            cd /root/project/instruqt-tracks/terraform-build-your-own-provider
             echo "Running instruqt track push..."
             instruqt track push --force
             echo "Running instruqt track test..."
@@ -76,7 +76,7 @@ workflows:
             branches:
               only:
                 - master
-      - terraform-col-iac:
+      - terraform-build-your-own-provider:
           requires:
             - validate
           filters:
@@ -93,6 +93,6 @@ workflows:
                 - master
     jobs:
       - validate
-      - terraform-col-iac:
+      - terraform-build-your-own-provider:
           requires:
             - validate
