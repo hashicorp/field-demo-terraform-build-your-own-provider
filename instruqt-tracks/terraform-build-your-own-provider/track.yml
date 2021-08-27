@@ -15,7 +15,7 @@ owner: hashicorp
 developers:
 - neil@hashicorp.com
 - nyoung@hashicorp.com
-private: true
+private: false
 published: true
 show_timer: true
 skipping_enabled: true
