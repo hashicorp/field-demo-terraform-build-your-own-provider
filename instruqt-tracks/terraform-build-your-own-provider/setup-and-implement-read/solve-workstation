@@ -9,7 +9,7 @@ curl localhost:19090/health
 
 # Check out the branch with all the correct files
 cd $PROJECT_HOME_DIR
-git checkout implement-read-instruqt
+git checkout -f implement-read-instruqt
 
 # Initialize the module for our provider and install the dependencies.
 go mod init terraform-provider-hashicups

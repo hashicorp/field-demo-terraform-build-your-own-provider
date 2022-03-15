@@ -2,7 +2,7 @@
 
 # Check out the branch with all the correct files
 cd $PROJECT_HOME_DIR
-git checkout implement-delete-instruqt
+git checkout -f implement-delete-instruqt
 
 # Install the provider
 make instruqt_install

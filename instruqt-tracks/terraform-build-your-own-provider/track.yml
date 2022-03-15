@@ -2017,7 +2017,11 @@ challenges:
   teaser: Learn to add import capabilities to the order resource for a Terraform provider.
   notes:
   - type: text
-    contents: In this challenge, you will add import capabilities to the `order` resource of the HashiCups Terraform provider, which interacts with the HashiCups coffee shop application API. To do this, you will implement a `ResourceImporter()` function. This function retrieves an existing HashiCups order and brings it into Terraform state, enabling Terraform to manage it.
+    contents: In this challenge, you will add import capabilities to the `order` resource
+      of the HashiCups Terraform provider, which interacts with the HashiCups coffee
+      shop application API. To do this, you will implement a `ResourceImporter()`
+      function. This function retrieves an existing HashiCups order and brings it
+      into Terraform state, enabling Terraform to manage it.
   assignment: |-
     *Implement import*
 
@@ -2223,4 +2227,4 @@ challenges:
     hostname: workstation
   difficulty: advanced
   timelimit: 7200
-checksum: "15525267101452668400"
+checksum: "5080227507493756416"

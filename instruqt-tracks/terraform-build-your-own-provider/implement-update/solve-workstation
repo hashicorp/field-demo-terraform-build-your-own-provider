@@ -2,7 +2,7 @@
 
 # Check out the branch with all the correct files
 cd $PROJECT_HOME_DIR
-git checkout implement-update-instruqt
+git checkout -f implement-update-instruqt
 
 # Install the provider
 make instruqt_install

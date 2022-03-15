@@ -2,7 +2,7 @@
 
 # Check out the previous branch to make sure everything is as we expect
 cd $PROJECT_HOME_DIR
-git checkout implement-update-instruqt
+git checkout -f implement-update-instruqt
 
 # Install the provider
 cd $PROJECT_HOME_DIR
