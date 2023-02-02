@@ -45,8 +45,7 @@ jobs:
             echo "Instruqt is installed and updated to most recent version."
           fi
           echo "Running instruqt track validate..."
-          sudo ls /home/runner/work/
-          for dir in $(sudo ls -d /home/runner/work/terraform-build-your-own-provider/terraform-build-your-own-provider/instruqt-tracks/*); do
+          for dir in $(sudo ls -d /home/runner/work/field-demo-terraform-build-your-own-provider/field-demo-terraform-build-your-own-provider/instruqt-tracks/*); do
             cd $dir && instruqt track validate
           done
   terraform-build-your-own-provider:
@@ -78,7 +77,7 @@ jobs:
             echo "Instruqt is installed and updated to most recent version."
           fi
 
-          cd /home/runner/work/
+          cd /home/runner/work/field-demo-terraform-build-your-own-provider/field-demo-terraform-build-your-own-provider/instruqt-tracks/*
           echo "Running instruqt track push..."
           instruqt track push --force
           echo "Running instruqt track test..."
