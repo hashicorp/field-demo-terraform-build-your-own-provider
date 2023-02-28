@@ -1074,12 +1074,19 @@ challenges:
     cd examples
     ```
 
-    Update the provider section in your `main.tf` so they use the wrong credentials
+    Update your `HASHICUPS_USERNAME` and `HASHICUPS_PASSWORD` env vars so they use the wrong credentials.
+
+    ```
+    export HASHICUPS_USERNAME=education
+    export HASHICUPS_PASSWORD=test1234
+    ```
+
+    Note: You will need to remove the hard coded credentials in the provider section of the `main.tf`
 
     ```
     provider "hashicups" {
-      username = "education"
-      password = "badpassword"
+      - username = "education"
+      - password = "test123"
     }
     ```
 
@@ -1208,13 +1215,13 @@ challenges:
     }
     ```
 
-    Fix your Terraform configuration in your `main.tf` to use the correct credentials.
+    Fix your Terraform configuration to use the correct credentials.
+
+    Update your `HASHICUPS_USERNAME` and `HASHICUPS_PASSWORD` env vars so they use the right credentials again.
 
     ```
-    provider "hashicups" {
-      username = "education"
-      password = "test123"
-    }
+    export HASHICUPS_USERNAME=education
+    export HASHICUPS_PASSWORD=test123
     ```
 
     Finally, re-initializing your workspace and applying the configuration.
