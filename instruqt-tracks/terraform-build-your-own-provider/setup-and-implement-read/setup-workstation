@@ -1,17 +1,11 @@
 #!/bin/sh
 
 ###########
-# Requires Golang version 1.16.3
+# Requires Golang version 1.20.1
 # Requires Docker Compose version 1.29.1
+# Built into hashistack-0.14.0 version
 ###########
 PROJECT_HOME_DIR="/root/github.com/hashicorp/terraform-provider-hashicups/"
-
-
-###########
-# Install Docker Compose and Docker
-###########
-apt-get update
-apt install -y docker-compose docker.io
 
 sudo systemctl unmask docker
 sudo systemctl start docker

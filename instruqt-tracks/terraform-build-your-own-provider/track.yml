@@ -75,6 +75,7 @@ challenges:
 
     ```
     go mod init terraform-provider-hashicups
+    go mod tidy
     go mod vendor
     ```
 
@@ -535,6 +536,7 @@ challenges:
     directory, and install all dependencies inside it.
 
     ```
+    go mod tidy
     go mod vendor
     ```
 
@@ -1072,11 +1074,13 @@ challenges:
     cd examples
     ```
 
-    Update your `HASHICUPS_USERNAME` and `HASHICUPS_PASSWORD` env vars so they use the wrong credentials.
+    Update the provider section in your `main.tf` so they use the wrong credentials
 
     ```
-    export HASHICUPS_USERNAME=education
-    export HASHICUPS_PASSWORD=test1234
+    provider "hashicups" {
+      username = "education"
+      password = "badpassword"
+    }
     ```
 
     Next, initialize your workspace to refresh your HashiCups provider, then apply.
@@ -1204,13 +1208,13 @@ challenges:
     }
     ```
 
-    Fix your Terraform configuration to use the correct credentials.
-
-    Update your `HASHICUPS_USERNAME` and `HASHICUPS_PASSWORD` env vars so they use the right credentials again.
+    Fix your Terraform configuration in your `main.tf` to use the correct credentials.
 
     ```
-    export HASHICUPS_USERNAME=education
-    export HASHICUPS_PASSWORD=test123
+    provider "hashicups" {
+      username = "education"
+      password = "test123"
+    }
     ```
 
     Finally, re-initializing your workspace and applying the configuration.
