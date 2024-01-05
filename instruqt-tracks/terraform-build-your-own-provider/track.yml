@@ -1,6 +1,5 @@
 slug: terraform-build-your-own-provider
-id: h1tpybfmtmve
-type: track
+id: yxy1aq8yxjfr
 title: Build Your Own Terraform Provider
 teaser: Learn how to create your own Terraform Provider to perform CRUD operations.
 description: |-
@@ -11,17 +10,15 @@ description: |-
 icon: https://storage.googleapis.com/instruqt-frontend/assets/hashicorp/tracks/terraform.png
 tags:
 - terraform
-owner: hashicorp
+owner: hashicorp-field-ops
 developers:
 - neil@hashicorp.com
 - nyoung@hashicorp.com
-private: false
-published: true
 show_timer: true
 skipping_enabled: true
 challenges:
 - slug: setup-and-implement-read
-  id: urdnvy0p0y1w
+  id: qw7yvjvgcbhc
   type: challenge
   title: Setup and Implement Read
   teaser: Learn to implement a read on a public endpoint with a Terraform Provider.
@@ -426,7 +423,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: add-authentication-to-a-provider
-  id: 1bxvxvprv1gx
+  id: 1yy502820jl4
   type: challenge
   title: Add Authentication to a Provider
   teaser: Learn to implement authentication in a Terraform Provider.
@@ -648,7 +645,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: implement-a-complex-read
-  id: bcwthxrik7le
+  id: rrfm0r6evlhx
   type: challenge
   title: Implement a Complex Read
   teaser: Learn to read from an auth protected endpoint with a Terraform Provider.
@@ -968,7 +965,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: debug-a-terraform-provider
-  id: pq4kpsszirwi
+  id: 2fscitugskaz
   type: challenge
   title: Debug a Terraform Provider
   teaser: Learn to add custom error messages to a Terraform provider.
@@ -1255,7 +1252,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: implement-create
-  id: sfluifh0t6vq
+  id: fascybxsl08s
   type: challenge
   title: Implement Create
   teaser: Learn to create an `order` resource with a Terraform provider.
@@ -1726,7 +1723,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: implement-update
-  id: on5qwvfur9xr
+  id: f6qofbppn8qx
   type: challenge
   title: Implement Update
   teaser: Learn to add update capabilities to the order resource of a Terraform provider.
@@ -1913,7 +1910,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: implement-delete
-  id: pjionakyoqpj
+  id: 8xexaybqcj4r
   type: challenge
   title: Implement Delete
   teaser: Learn to add delete capabilities to the order resource for a Terraform provider.
@@ -2022,7 +2019,7 @@ challenges:
   difficulty: advanced
   timelimit: 900
 - slug: implement-import
-  id: wwco2dpljowt
+  id: ijigaoqb976i
   type: challenge
   title: Implement Import
   teaser: Learn to add import capabilities to the order resource for a Terraform provider.
@@ -2238,4 +2235,10 @@ challenges:
     hostname: workstation
   difficulty: advanced
   timelimit: 7200
-checksum: "5080227507493756416"
+lab_config:
+  overlay: false
+  width: 25
+  position: right
+  feedback_recap_enabled: true
+  loadingMessages: true
+checksum: "2995215360443613969"
