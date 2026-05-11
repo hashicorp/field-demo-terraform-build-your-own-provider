@@ -1,3 +1,5 @@
+# Copyright IBM Corp. 2021, 2026
+
 version: "2"
 virtualmachines:
 - name: workstation
